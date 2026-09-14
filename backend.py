@@ -1,4 +1,4 @@
-from langchain_core.utils import uuid
+import uuid
 import psycopg
 import os
 import dotenv

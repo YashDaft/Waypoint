@@ -396,7 +396,6 @@ def country_name_to_code(text: str):
     return None
 
 
-print(pycountry.countries)
 
 #for checking if the airport matches the country
 def airport_country_matches(airport: dict, country_code: str):
