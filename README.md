@@ -5,7 +5,6 @@ An open source AI travel planner that turns a natural-language trip request into
 ![Python](https://img.shields.io/badge/python-3.14%2B-blue)
 ![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688)
 ![LangGraph](https://img.shields.io/badge/orchestration-LangGraph-1c3c3c)
-![License](https://img.shields.io/badge/license-MIT-green)
 
 ## Why this project?
 
