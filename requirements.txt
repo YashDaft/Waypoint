@@ -3,6 +3,7 @@ langchain
 langchain-google-genai
 langchain-community
 langchain-tavily
+langchain-mcp-adapters
 psycopg[binary]
 psycopg_pool
 tavily-python
@@ -13,3 +14,5 @@ pycountry
 fastapi
 uvicorn
 jinja2
+nest_asyncio
+mcp
