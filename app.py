@@ -1,14 +1,14 @@
-from email import message
 from pathlib import Path
 import traceback
 import uvicorn
-
+import os
 from backend import run_travel_agent
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -29,15 +29,12 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
 class TravelRequest(BaseModel):
-    message:str
+    message: str
     thread_id: str | None = None
 
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """
-    Return the index.html page with proper template rendering.
-    """
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -53,13 +50,11 @@ async def travel_planner(request_data: TravelRequest):
         if not user_message:
             return JSONResponse(
                 status_code=400,
-                content={
-                    "success": False,
-                    "error": "Message cannot be empty."
-                }
+                content={"success": False, "error": "Message cannot be empty."}
             )
 
-        result = run_travel_agent(
+        result = await run_in_threadpool(
+            run_travel_agent,
             user_input=user_message,
             thread_id=request_data.thread_id
         )
@@ -71,6 +66,7 @@ async def travel_planner(request_data: TravelRequest):
                 "answer": result["answer"],
                 "flight_results": result["flight_results"],
                 "hotel_results": result["hotel_results"],
+                "weather_results": result["weather_results"],
                 "itinerary": result["itinerary"],
                 "llm_calls": result["llm_calls"],
             }
@@ -82,18 +78,13 @@ async def travel_planner(request_data: TravelRequest):
 
         return JSONResponse(
             status_code=500,
-            content={
-                "success": False,
-                "error": str(e)
-            }
+            content={"success": False, "error": str(e)}
         )
+
 
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "ok",
-        "message": "AI Travel Planner API is running"
-    }
+    return {"status": "ok", "message": "AI Travel Planner API is running"}
 
 
 @app.get("/favicon.ico")
@@ -101,28 +92,12 @@ async def favicon():
     return JSONResponse(content={})
 
 
-#executing server
+is_local = os.environ.get("PORT") is None
+
 if __name__ == "__main__":
     uvicorn.run(
         "app:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True
+        host="localhost" if is_local else "0.0.0.0",
+        port=int(os.environ.get("PORT", 8000)),
+        reload=is_local
     )
-
-
-
-      
-       
-
-
-
-
-
-
-
-
-
-
-
-
