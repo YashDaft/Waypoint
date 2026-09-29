@@ -60,9 +60,6 @@ client = MultiServerMCPClient(
 )
 
 
-
-
-
 search_tool = None
 
 aviation_tools = {}
