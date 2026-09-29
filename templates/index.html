@@ -6,7 +6,7 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Waypoint AI </title>
+    <title>Waypoint AI</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,7 +29,7 @@
 
         <section class="hero-section">
             <div class="badge">
-                ✈️ Waypoint AI — A Multi-Agent Travel Planner with LangGraph
+                ✈️ Waypoint AI — A Multi-Agent Travel Planner with LangGraph and MCP
             </div>
 
             <h1>
@@ -37,8 +37,8 @@
             </h1>
 
             <p>
-                Search flights, discover hotels, and generate a complete travel itinerary using a multi-agent LangGraph
-                system.
+                A supervisor agent sends your request to specialist agents for flights, hotels, weather and budget.
+                You review the draft itinerary before the final plan is created.
             </p>
         </section>
 
@@ -59,35 +59,57 @@
             </div>
 
             <div class="input-area">
-                <textarea id="userInput"
+                <textarea id="userInput" aria-label="Your travel request"
                     placeholder="Plan a complete 7 days Japan trip including flights, hotels and sightseeing under 3 lakhs..."></textarea>
 
-                <button id="sendBtn" onclick="sendMessage()">
-                    <span id="btnText">Generate Plan</span>
+                <button id="sendBtn" type="button" onclick="sendMessage()">
+                    <span id="btnText">Generate Draft</span>
                     <span id="btnLoader" class="loader hidden"></span>
                 </button>
             </div>
 
+            <p id="loadingNote" class="loading-note hidden" role="status">
+                <span class="note-spinner" aria-hidden="true"></span>
+                The agents are working on your plan. This can take up to a minute.
+            </p>
+
             <div class="quick-prompts">
-                <button
+                <button type="button"
                     onclick="setPrompt('Plan a complete 7 days Japan trip from India including flights, hotels and sightseeing under 3 lakhs.')">
                     Japan Trip
                 </button>
 
-                <button
+                <button type="button"
                     onclick="setPrompt('Plan a 5 days Dubai trip from Delhi with flights, hotels and sightseeing.')">
                     Dubai Trip
                 </button>
 
-                <button
+                <button type="button"
                     onclick="setPrompt('Plan a 7 days Thailand trip from India with budget hotels and sightseeing.')">
                     Thailand Trip
                 </button>
 
-                <button onclick="setPrompt('Give me all country flight info.')">
+                <button type="button" onclick="setPrompt('Give me all country flight info.')">
                     Global Flights
                 </button>
             </div>
+
+        </section>
+
+        <section id="workflowSection" class="workflow-section hidden" aria-labelledby="workflowTitle">
+
+            <div class="workflow-header">
+                <div>
+                    <h2 id="workflowTitle">Execution Plan</h2>
+                    <p id="workflowSubtitle">Chosen by the supervisor agent for your request.</p>
+                </div>
+
+                <span id="guardrailBadge" class="guardrail-badge">Guardrail passed</span>
+            </div>
+
+            <p id="supervisorReasoning" class="supervisor-reasoning"></p>
+
+            <ol id="agentRoute" class="route" aria-label="Agents that run, in order"></ol>
 
         </section>
 
@@ -95,16 +117,19 @@
 
             <div class="result-header">
                 <div>
-                    <h2>Your AI Travel Plan</h2>
+                    <h2 id="resultTitle">Your AI Travel Plan</h2>
+                    <p id="resultHint" class="result-hint hidden">
+                        This is a draft. Approve it or ask for changes below the plan.
+                    </p>
                     <p id="threadInfo">Thread ID: -</p>
                 </div>
 
                 <div class="result-actions">
-                    <button class="copy-btn" onclick="copyResult()">
+                    <button class="copy-btn" type="button" onclick="copyResult()">
                         Copy
                     </button>
 
-                    <button class="download-btn" onclick="downloadPDF()">
+                    <button class="download-btn" type="button" onclick="downloadPDF()">
                         Download PDF
                     </button>
                 </div>
@@ -117,12 +142,39 @@
 
         </section>
 
-        <section id="errorBox" class="error-box hidden"></section>
+        <section id="approvalSection" class="approval-section hidden" aria-labelledby="approvalTitle">
+
+            <div class="approval-icon" aria-hidden="true">👤</div>
+
+            <div class="approval-content">
+                <h2 id="approvalTitle">Review the draft itinerary</h2>
+                <p id="approvalRequest">
+                    Approve the draft or provide feedback before the final plan is generated.
+                </p>
+
+                <label class="sr-only" for="approvalFeedback">Revision feedback</label>
+                <textarea id="approvalFeedback" class="feedback-input"
+                    placeholder="Want changes? Tell the planner what to adjust, for example: reduce the hotel cost and add one free day..."></textarea>
+
+                <div class="approval-actions">
+                    <button id="approveBtn" class="approve-btn" type="button" onclick="submitApproval(true)">
+                        Approve &amp; Generate Final
+                    </button>
+
+                    <button id="reviseBtn" class="revise-btn" type="button" onclick="submitApproval(false)">
+                        Revise Using Feedback
+                    </button>
+                </div>
+            </div>
+
+        </section>
+
+        <section id="errorBox" class="error-box hidden" role="alert"></section>
 
     </main>
 
     <footer>
-        Built with FastAPI, LangGraph, Gemini, PostgreSQL, Tavily and AviationStack
+        Built with FastAPI, LangGraph, Gemini, PostgreSQL, Tavily, AviationStack, OpenWeather and MCP
     </footer>
 
     <!-- Markdown Renderer -->
