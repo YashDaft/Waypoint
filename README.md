@@ -141,9 +141,7 @@ Waypoint is deployed on [Render](https://render.com) as a Docker-based web servi
 2. On Render, create a new **Web Service** and connect the repo — Render will detect and build the included `Dockerfile` automatically.
 3. Add the environment variables listed above under the service's **Environment** tab.
 4. Render assigns the app's port at runtime via the `PORT` environment variable — `app.py` already binds to `host="0.0.0.0"` and reads `port=int(os.environ.get("PORT", 8000))` in production rather than a hardcoded host/port.
-5. Every push to the connected branch triggers an automatic redeploy.
 
-> ⚠️ Render's router can't reach a server bound to `127.0.0.1` — it must bind to `0.0.0.0`, and the port must come from the `PORT` environment variable Render sets at runtime, not a hardcoded value.
 
 ## API Endpoints
 
