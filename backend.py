@@ -1,4 +1,3 @@
-from win32.lib.win32con import EMR_POLYPOLYGON
 import uuid
 import psycopg
 import os
