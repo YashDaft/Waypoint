@@ -6,6 +6,12 @@ An open-source AI travel planner that turns a natural-language trip request into
 ![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688)
 ![LangGraph](https://img.shields.io/badge/orchestration-LangGraph-1c3c3c)
 
+## Live Demo
+
+🌐 **[waypoint-vm96.onrender.com](https://waypoint-vm96.onrender.com)**
+
+If the app has been idle, the first load can take a moment while the service wakes up.
+
 ## Why this project?
 
 Planning a trip usually means jumping between multiple websites, tools, and spreadsheets. Waypoint brings that into one flow: a supervisor agent reads the request, runs a guardrail check, and decides which specialists are actually relevant —
