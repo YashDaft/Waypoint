@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 
+from psycopg_pool import ConnectionPool
 from langgraph.graph import StateGraph, START, END, add_messages
 from langgraph.checkpoint.postgres import PostgresSaver
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -695,13 +696,22 @@ workflow.add_edge("guardrail_blocked", END)
 
 DATABASE_URL = get_database_url()
 
-_conn = psycopg.connect(
+# A pool instead of one connection: Neon closes idle connections when it
+# goes to sleep, and the pool replaces dead connections with fresh ones
+db_pool = ConnectionPool(
     DATABASE_URL,
-    autocommit=True,
-    row_factory=dict_row
+    min_size=1,
+    max_size=5,
+    open=True,
+    check=ConnectionPool.check_connection,
+    kwargs={
+        "autocommit": True,
+        "prepare_threshold": 0,
+        "row_factory": dict_row,
+    },
 )
 
-checkpointer = PostgresSaver(_conn)
+checkpointer = PostgresSaver(db_pool)
 
 checkpointer.setup()
 
