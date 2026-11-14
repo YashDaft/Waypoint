@@ -1,6 +1,6 @@
-# 🧭 Waypoint, A Multi Agent Travel Itinerary Generator with LangGraph
+# Waypoint, A Multi Agent Travel Itinerary Generator with LangGraph
 
-An open-source AI travel planner that turns a natural-language trip request into a practical, human-approved travel plan — routed through a supervisor agent that decides which specialists (flights, hotels, weather, budget) a request actually needs.
+An open-source AI travel planner that turns a natural-language trip request into a practical, human-approved travel plan, routed through a supervisor agent that decides which specialists (flights, hotels, weather, budget) a request actually needs.
 
 ![Python](https://img.shields.io/badge/python-3.14%2B-blue)
 ![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688)
