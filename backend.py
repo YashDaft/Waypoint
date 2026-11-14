@@ -62,7 +62,7 @@ if not GEMINI_API_KEY:
 
 # main model: fast and smart, but Google sometimes returns 503 when it's busy
 main_llm = ChatGoogleGenerativeAI(
-    model="gemini-3.5-flash",
+    model="gemini-3.5-flash-lite",
     api_key=GEMINI_API_KEY,
     max_retries=2,
     timeout=60,
