@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import operator
 import asyncio
 import json
+import logging
 
 from langgraph.graph import StateGraph, START, END, add_messages
 from langgraph.checkpoint.postgres import PostgresSaver
@@ -30,7 +31,9 @@ from mcp_client import (
     weather_mcp_search
 )
 
-
+# httpx logs every request URL, and the Tavily MCP URL contains the API key,
+# so only let httpx log warnings and errors
+logging.getLogger("httpx").setLevel(logging.WARNING)
 load_dotenv()
 
 
