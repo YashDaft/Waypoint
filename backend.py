@@ -31,10 +31,12 @@ from mcp_client import (
     weather_mcp_search
 )
 
+
+load_dotenv()
+
 # httpx logs every request URL, and the Tavily MCP URL contains the API key,
 # so only let httpx log warnings and errors
 logging.getLogger("httpx").setLevel(logging.WARNING)
-load_dotenv()
 
 
 def get_database_url():
