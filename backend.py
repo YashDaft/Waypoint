@@ -1,4 +1,3 @@
-from win32.lib.win32con import EMR_POLYPOLYGON
 import uuid
 import psycopg
 import os
@@ -56,10 +55,24 @@ if not GEMINI_API_KEY:
     raise ValueError("GOOGLE_API_KEY not found in environment variables, please add gemini api key to .env file")
 
 
-llm = ChatGoogleGenerativeAI(
+# main model: fast and smart, but Google sometimes returns 503 when it's busy
+main_llm = ChatGoogleGenerativeAI(
     model="gemini-3.8-flash",
     api_key=GEMINI_API_KEY,
+    max_retries=2,
+    timeout=60,
 )
+
+# backup model: used only if the main model fails
+backup_llm = ChatGoogleGenerativeAI(
+    model="gemini-3.5-flash-lite",
+    api_key=GEMINI_API_KEY,
+    max_retries=2,
+    timeout=60,
+)
+
+
+llm = main_llm.with_fallbacks([backup_llm])
 
 class TravelState(TypedDict, total=False):
 
