@@ -2,6 +2,7 @@ import os
 import certifi
 import asyncio
 import sys
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -13,12 +14,19 @@ from tools.custom_weather_mcp import OPENWEATHER_API_KEY
 
 load_dotenv()
 
+# httpx logs every request URL, and the Tavily MCP URL contains the API key,
+# so only let httpx log warnings and errors
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-AVIATIONSTACK_API_KEY = os.getenv("AVIATIONSTACK_API_KEY")
+SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY", "")
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
 WEATHER_SERVER_PATH = Path(__file__).parent / "tools/custom_weather_mcp.py"
 WEATHER_ENV = {"OPENWEATHER_API_KEY": OPENWEATHER_API_KEY}
+
+FLIGHTS_SERVER_PATH = Path(__file__).parent / "tools/flights_mcp.py"
+FLIGHTS_ENV = {"SERPAPI_API_KEY": SERPAPI_API_KEY}
 
 GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GEMINI_API_KEY:
@@ -37,16 +45,12 @@ client = MultiServerMCPClient(
             "transport": "streamable_http",
             "url":f"https://mcp.tavily.com/mcp/?tavilyApiKey={TAVILY_API_KEY}"
         },
-        #local mcp server, implementing from aviationstack-mcp github repository
-        "Aviationstack": {
+        #local custom made flights mcp server (serpapi google flights)
+        "flights": {
             "transport": "stdio",
-            "command": "uvx",
-            "args": [
-                "aviationstack-mcp"
-            ],
-            "env": {
-            "AVIATION_STACK_API_KEY": AVIATIONSTACK_API_KEY
-            }
+            "command": sys.executable,
+            "args": [str(FLIGHTS_SERVER_PATH)],
+            "env": FLIGHTS_ENV
         },
         #local custom made mcp server
         "weather": {
@@ -93,18 +97,26 @@ async def tavily_mcp_search(query:str):
     result = await search_tool.ainvoke({"query": query})
     return result
 
-#calling aviation mcp server tool
-async def aviation_mcp_call(tool_name: str, tool_args: dict=None):
+#calling flights mcp server tool
+flights_tool = None
 
-    tools = await client.get_tools()
+async def flights_mcp_search(origin_airport: str, destination_airport: str, outbound_date: str = "", trip_days: int = 5):
 
-    tool = next(
-        t for t in tools if t.name == tool_name
-    )
+    global flights_tool
 
-    result = await tool.ainvoke(tool_args or {})
+    if flights_tool is None:
+        tools = await client.get_tools()
+        flights_tool = next(
+            tool for tool in tools
+            if tool.name == "search_flights"
+        )
 
-    return result
+    return await flights_tool.ainvoke({
+        "origin_airport": origin_airport,
+        "destination_airport": destination_airport,
+        "outbound_date": outbound_date,
+        "trip_days": trip_days
+    })
 
 
 #Weather tools
@@ -174,6 +186,9 @@ def extract_destination(query: str):
     response = llm.invoke(prompt)
 
     return _extract_text(response.content)
+
+
+
 
 
 

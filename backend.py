@@ -7,7 +7,9 @@ import operator
 import asyncio
 import json
 import logging
+import atexit 
 
+from datetime import date
 from psycopg_pool import ConnectionPool
 from langgraph.graph import StateGraph, START, END, add_messages
 from langgraph.checkpoint.postgres import PostgresSaver
@@ -26,7 +28,7 @@ from langchain_core.messages import (
 from mcp_client import (
     _extract_text,
     tavily_mcp_search, 
-    aviation_mcp_call,
+    flights_mcp_search,
     extract_destination,
     forecast_mcp_search,
     weather_mcp_search
@@ -160,7 +162,11 @@ def empty_constraints() -> dict[str, Any]:
         "duration": "",
         "budget": "",
         "travel_style": "",
-        "special_preferences": ""
+        "special_preferences": "",
+        "origin_airport": "",
+        "destination_airport": "",
+        "travel_date": "",
+        "trip_days": ""
     }
 
 #Supervisor agent
@@ -241,6 +247,17 @@ Extract any trip details mentioned in the request into "trip_constraints". Leave
 a field as an empty string (or empty list for "special_preferences") if the user
 did not mention it — do not guess or invent values.
 
+Extra fields for flight search:
+- origin_airport / destination_airport: the 3-letter IATA code of the main
+  international airport for the origin and destination cities (for example
+  Delhi = DEL, Dubai = DXB). Fill these whenever the city is known. Leave them
+  empty if the city is not mentioned.
+- travel_date: only if the user gave a specific start date, written as
+  YYYY-MM-DD. Today's date is {date.today().isoformat()}, so use it to work out
+  the year. Leave it empty if no date was given.
+- trip_days: the trip length in days as a number (for example 5), if the user
+  mentioned it. Leave it empty otherwise.
+
 User request:
 {query}
 
@@ -254,7 +271,11 @@ and no text before or after it:
     "duration": "",
     "budget": "",
     "travel_style": "",
-    "special_preferences": []
+    "special_preferences": [],
+    "origin_airport": "",
+    "destination_airport": "",
+    "travel_date": "",
+    "trip_days": ""
   }},
   "reasoning": ""
 }}
@@ -325,69 +346,115 @@ You are a flight research specialist helping plan a trip.
 User Request:
 {query}
 
-Available Airport Data:
-{airport_data}
+Flight data source: {source}
 
-Available Airline Data:
-{airline_data}
+Flight Data:
+{flight_data}
 
-Using ONLY the information provided above, produce a concise flight briefing with these sections:
+Using ONLY the flight data above, write a short flight briefing in Markdown with these sections:
 
-1. **Departure Airport** — most likely departure airport (name + IATA code) based on the user's request.
-2. **Arrival Airport** — most likely arrival airport (name + IATA code) for the destination.
-3. **Airlines Serving This Route** — airlines found in the data above that operate this route.
-4. **Typical Flight Duration** — an approximate duration, clearly marked as an estimate.
-5. **Estimated Airfare Range** — only if pricing is present in the data above. If not, say so explicitly rather than guessing.
-6. **Peak Season Considerations** — note if the travel dates overlap with a known peak season for this route.
-7. **Booking Advice** — 1-2 practical, actionable tips.
+1. **Route** — the departure and arrival airports.
+2. **Flight Options** — the best 3 options, each with airline, price, duration and number of stops.
+3. **Typical Price Range** — only if it is in the data.
+4. **Dates Searched** — the travel dates these prices are for, only if they are in the data.
+5. **Booking Advice** — 1-2 practical, actionable tips.
 
 Rules:
-- Do NOT invent airport codes, airlines, prices, or durations not supported by the data above.
-- If a section's data is missing or insufficient, say so clearly instead of guessing.
-- Format the response in Markdown using the headers above, so it can be cleanly incorporated into a larger itinerary.
+- Do NOT invent airlines, prices, durations or dates that are not in the data above.
+- Prices in the data are in Indian rupees (INR).
+- If the source is a web search, say clearly that the prices are rough estimates, not live fares.
+- If the user did not give travel dates, say that prices are for the dates searched and will change with other dates.
 """
 
+
 def flight_agent(state: TravelState):
-    
+
     query = state['user_query']
+    constraints = state.get("trip_constraints", {})
+
+    origin_airport = constraints.get("origin_airport", "")
+    destination_airport = constraints.get("destination_airport", "")
+    travel_date = constraints.get("travel_date", "")
+
+    # trip_days can come back as 5, "5" or "", so turn it into a number safely
+    try:
+        trip_days = int(constraints.get("trip_days") or 5)
+    except (ValueError, TypeError):
+        trip_days = 5
+
+    flight_data = ""
+    source = ""
+
+    # 1. live prices from google flights, when both airports are known
+    if origin_airport and destination_airport:
+        try:
+            result = asyncio.run(
+                flights_mcp_search(origin_airport, destination_airport, travel_date, trip_days)
+            )
+            flight_data = _extract_text(result)
+
+            # the tool returns {"error": ...} when serpapi fails
+            if "error" in json.loads(flight_data):
+                print("Flight search error:", flight_data)
+                flight_data = ""
+            else:
+                source = "Google Flights (live prices)"
+
+        except Exception as e:
+            print(f"Flight search failed: {e}")
+            flight_data = ""
+
+    # 2. backup: search the web for typical flights and prices
+    if flight_data == "":
+        origin = constraints.get("origin", "")
+        destination = constraints.get("destination", "")
+
+        if origin and destination:
+            search_query = f"flights from {origin} to {destination} airlines and ticket price"
+        else:
+            search_query = f"flights for {query}"
+
+        try:
+            result = asyncio.run(tavily_mcp_search(search_query))
+            flight_data = _extract_text(result)
+            source = "web search (rough estimates, not live prices)"
+        except Exception as e:
+            print(f"Flight web search failed: {e}")
+            flight_data = ""
+
+    # nothing found from either source, so skip the llm call
+    if flight_data == "":
+        return {
+            "flight_results": "Flight information is unavailable right now.",
+            "messages": [AIMessage(content="Flight information unavailable")],
+            "llm_calls": state.get("llm_calls", 0)
+        }
+
+    prompt = FLIGHT_AGENT_PROMPT.format(
+        query=query,
+        source=source,
+        flight_data=flight_data
+    )
 
     try:
-
-        airports = asyncio.run(
-            aviation_mcp_call("list_airports")
-        )
-
-        airlines = asyncio.run(
-            aviation_mcp_call("list_airlines")
-        )
-
-        print("AIRPORTS:", airports)
-        print("\nAIRLINES:", airlines)
-
-        prompt = FLIGHT_AGENT_PROMPT.format(
-            query=query,
-            airport_data=str(airports),
-            airline_data=str(airlines)
-        )
-
         response = llm.invoke([
             SystemMessage(
                 content="You are an expert travel flight planner. Use the provided data to give accurate, useful guidance. Do not guess or invent information."
             ),
             HumanMessage(content=prompt)
         ])
-
-        flight_data = response.content
+        flight_results = _extract_text(response.content)
         llm_calls_made = 1
 
     except Exception as e:
-        flight_data = f"Flight information unavailable: {str(e)}"
+        print(f"Flight agent LLM failed: {e}")
+        flight_results = "Flight information is unavailable right now."
         llm_calls_made = 0
-    
+
     return {
-        "flight_results": flight_data,
+        "flight_results": flight_results,
         "messages": [AIMessage(content="Flight recommendations generated")],
-        "llm_calls": state.get("llm_calls",0) + llm_calls_made
+        "llm_calls": state.get("llm_calls", 0) + llm_calls_made
     }
 
 
@@ -710,6 +777,9 @@ db_pool = ConnectionPool(
         "row_factory": dict_row,
     },
 )
+
+# close the pool cleanly when the app exits
+atexit.register(db_pool.close)
 
 checkpointer = PostgresSaver(db_pool)
 
