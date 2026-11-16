@@ -637,7 +637,8 @@ Budget Results:
 
 Instructions:
 - Respect the Trip Constraints above (destination, duration, travel style, and any special preferences) as the frame for the plan.
-- Use the Weather Results to shape the plan practically — favor outdoor activities on clear/mild days, and suggest indoor alternatives on days with rain, extreme heat, or poor conditions. If the Weather Results say the forecast is not for the trip dates, do not tie forecast days to trip days; plan around the destination's typical weather for that month instead.- Use the Budget Results to keep suggested activities and pacing realistic for the stated budget, and call out anywhere the plan pushes close to a stated budget limit.
+- Use the Weather Results to shape the plan practically — favor outdoor activities on clear/mild days, and suggest indoor alternatives on days with rain, extreme heat, or poor conditions. If the Weather Results say the forecast is not for the trip dates, do not tie forecast days to trip days; plan around the destination's typical weather for that month instead.
+- Use the Budget Results to keep suggested activities and pacing realistic for the stated budget, and call out anywhere the plan pushes close to a stated budget limit.
 - Base the itinerary strictly on the Flight, Hotel, Weather, and Budget data provided above. Do NOT invent flight numbers, hotel names, or prices that aren't present in the data.
 - If any of the above data is missing or incomplete, acknowledge the gap briefly rather than fabricating details.
 - Make the itinerary rational, practical, budget-aware, and easy to follow.
@@ -720,6 +721,7 @@ Structure your response using clean Markdown with the following exact sections:
 
 ### 2. ☀️ Weather Overview
 [Summarize the Weather data above. If it says the forecast is not for the trip dates, describe the typical weather for the travel month instead and say clearly that it is typical weather, not a forecast. Call out anything that should influence packing or daily plans — rain, extreme heat/cold, or notably pleasant days.]
+
 ### 3. ✈️ Flight Information
 [Detail the flight options cleanly. If pricing is missing from the data, explicitly state: "Note: Live ticket prices are currently unavailable from the API. Please verify fares directly with the airline."]
 
