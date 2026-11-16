@@ -458,28 +458,96 @@ def flight_agent(state: TravelState):
     }
 
 
-#hotel searching agent that will fetch results from tavily search tool in the mcp server for best hotels as per user query.
+#hotel searching agent: searches tavily for hotels in the destination and keeps only the useful parts
 def hotel_agent(state: TravelState):
-    query = f"Best hotels for {state['user_query']}"
-    # hotel_results = tavily_search(query)
-    hotel_results = asyncio.run(tavily_mcp_search(query))
+
+    constraints = state.get("trip_constraints", {})
+    destination = constraints.get("destination", "")
+    travel_style = constraints.get("travel_style", "")
+
+    # search with the destination instead of the whole user message
+    if destination and travel_style:
+        query = f"best {travel_style} hotels in {destination}"
+    elif destination:
+        query = f"best hotels in {destination}"
+    else:
+        query = f"best hotels for {state['user_query']}"
+
+    try:
+        raw_results = _extract_text(asyncio.run(tavily_mcp_search(query)))
+    except Exception as e:
+        print(f"Hotel search failed: {e}")
+        raw_results = ""
+
+    # tavily returns json text: keep only the title, a short piece of content and the link
+    try:
+        data = json.loads(raw_results)
+        lines = []
+
+        for item in data.get("results", [])[:5]:
+            title = item.get("title", "")
+            content = item.get("content", "")[:400]
+            url = item.get("url", "")
+            lines.append(f"- {title}: {content} (source: {url})")
+
+        hotel_results = "\n".join(lines)
+
+    except ValueError:
+        # not json, so use the raw text but keep it short
+        hotel_results = raw_results[:3000]
+
+    if hotel_results == "":
+        hotel_results = "Hotel information is unavailable right now."
 
     return {
         "hotel_results": hotel_results,
         "messages": [
             AIMessage(content="Hotel information fetched.")
-        ],
-        "llm_calls": state.get("llm_calls", 0) + 1
+        ]
     }
 
-#Weather agent for fetching current and forecast weather as per user query
+#Weather agent for fetching current and forecast weather for the destination
 def weather_agent(state: TravelState):
 
-    city = extract_destination(state['user_query'])
+    constraints = state.get("trip_constraints", {})
 
-    weather_data = asyncio.run(weather_mcp_search(city))
+    # the supervisor already extracted the destination, so only ask the llm if it's missing
+    city = constraints.get("destination", "")
+    if city == "":
+        city = extract_destination(state['user_query'])
 
-    forecast_data = asyncio.run(forecast_mcp_search(city))
+    try:
+        weather_data = asyncio.run(weather_mcp_search(city))
+        forecast_data = asyncio.run(forecast_mcp_search(city))
+    except Exception as e:
+        print(f"Weather search failed: {e}")
+        return {
+            "weather_results": "Weather information is unavailable right now.",
+            "messages": [AIMessage(content="Weather information unavailable")]
+        }
+
+    # the forecast only covers the next 5 days, so check whether the trip starts inside that window
+    today = date.today()
+    travel_date = constraints.get("travel_date", "")
+    trip_starts_soon = False
+
+    if travel_date:
+        try:
+            start = date.fromisoformat(travel_date)
+            days_until_trip = (start - today).days
+            if 0 <= days_until_trip <= 4:
+                trip_starts_soon = True
+        except ValueError:
+            pass
+
+    if trip_starts_soon:
+        forecast_note = "The trip starts within the forecast window, so this forecast can be used for the trip days."
+    else:
+        forecast_note = (
+            f"IMPORTANT: this forecast covers only the next 5 days from today ({today.isoformat()}), "
+            "NOT the trip dates. Do not use it for the trip days. Describe the usual weather "
+            "for the destination in the travel month instead, and say it is typical weather, not a forecast."
+        )
 
     return {
         "weather_results": f"""
@@ -490,6 +558,8 @@ def weather_agent(state: TravelState):
         **Forecast Weather for {city}**
 
         {forecast_data}
+
+        {forecast_note}
         """,
         "messages": [
             AIMessage(content="Weather information fetched.")
@@ -567,8 +637,7 @@ Budget Results:
 
 Instructions:
 - Respect the Trip Constraints above (destination, duration, travel style, and any special preferences) as the frame for the plan.
-- Use the Weather Results to shape the plan practically — favor outdoor activities on clear/mild days, and suggest indoor alternatives on days with rain, extreme heat, or poor conditions.
-- Use the Budget Results to keep suggested activities and pacing realistic for the stated budget, and call out anywhere the plan pushes close to a stated budget limit.
+- Use the Weather Results to shape the plan practically — favor outdoor activities on clear/mild days, and suggest indoor alternatives on days with rain, extreme heat, or poor conditions. If the Weather Results say the forecast is not for the trip dates, do not tie forecast days to trip days; plan around the destination's typical weather for that month instead.- Use the Budget Results to keep suggested activities and pacing realistic for the stated budget, and call out anywhere the plan pushes close to a stated budget limit.
 - Base the itinerary strictly on the Flight, Hotel, Weather, and Budget data provided above. Do NOT invent flight numbers, hotel names, or prices that aren't present in the data.
 - If any of the above data is missing or incomplete, acknowledge the gap briefly rather than fabricating details.
 - Make the itinerary rational, practical, budget-aware, and easy to follow.
@@ -650,8 +719,7 @@ Structure your response using clean Markdown with the following exact sections:
 [Provide a brief, engaging 2-3 sentence overview of the trip, matching the user's requested vibe.]
 
 ### 2. ☀️ Weather Overview
-[Summarize current conditions and the forecast from the Weather data above. Call out anything that should influence packing or daily plans — rain, extreme heat/cold, or notably pleasant days.]
-
+[Summarize the Weather data above. If it says the forecast is not for the trip dates, describe the typical weather for the travel month instead and say clearly that it is typical weather, not a forecast. Call out anything that should influence packing or daily plans — rain, extreme heat/cold, or notably pleasant days.]
 ### 3. ✈️ Flight Information
 [Detail the flight options cleanly. If pricing is missing from the data, explicitly state: "Note: Live ticket prices are currently unavailable from the API. Please verify fares directly with the airline."]
 
