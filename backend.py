@@ -370,7 +370,7 @@ Using ONLY the flight data above, write a short flight briefing in Markdown with
 
 Rules:
 - Do NOT invent airlines, prices, durations or dates that are not in the data above.
-- Prices in the data are in Indian rupees (INR).
+- Prices in the data are in Indian rupees (INR) and are round-trip totals for one adult. Say this clearly next to the prices.
 - If the source is a web search, say clearly that the prices are rough estimates, not live fares.
 - If the user did not give travel dates, say that prices are for the dates searched and will change with other dates.
 """
@@ -657,6 +657,10 @@ Instructions:
 - Base the itinerary strictly on the Flight, Hotel, Weather, and Budget data provided above. Do NOT invent flight numbers, hotel names, or prices that aren't present in the data.
 - If any of the above data is missing or incomplete, acknowledge the gap briefly rather than fabricating details.
 - Make the itinerary rational, practical, budget-aware, and easy to follow.
+- You may suggest specific, well-known attractions and activities (for example
+  landmarks, markets, beaches) from general knowledge, by name. Mark them as
+  suggestions to verify. The rule against inventing applies to flights, hotel
+  names, prices and weather, not to sightseeing ideas.
 """
 
     try:
@@ -767,6 +771,10 @@ Structure your response using clean Markdown with the following exact sections:
 - Do NOT invent flights, hotels, prices, or weather conditions. Stick strictly to the provided input data.
 - If any section of the input data is empty or missing, gracefully acknowledge it and advise the user on how to find that information.
 - Keep the tone professional, inspiring, and highly actionable.
+- You may suggest specific, well-known attractions and activities (for example
+  landmarks, markets, beaches) from general knowledge, by name. Mark them as
+  suggestions to verify. The rule against inventing applies to flights, hotel
+  names, prices and weather, not to sightseeing ideas.
 """
 
     try:

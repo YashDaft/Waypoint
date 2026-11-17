@@ -21,7 +21,8 @@ def search_flights(origin_airport: str, destination_airport: str, outbound_date:
     else:
         outbound = date.fromisoformat(outbound_date)
 
-    return_day = outbound + timedelta(days=trip_days)
+    # a 5 day trip starting on the 17th covers the 17th to the 21st, so fly back on day 5
+    return_day = outbound + timedelta(days=max(trip_days - 1, 1))
 
     try:
         response = requests.get(
@@ -59,7 +60,7 @@ def search_flights(origin_airport: str, destination_airport: str, outbound_date:
         options.append(
             {
                 "airline": first_leg["airline"],
-                "price_inr": option.get("price"),
+                "round_trip_price_inr": option.get("price"),
                 "duration": f"{hours}h {minutes}m",
                 "stops": len(option["flights"]) - 1
             }
@@ -69,6 +70,7 @@ def search_flights(origin_airport: str, destination_airport: str, outbound_date:
 
     return {
         "route": f"{origin_airport} to {destination_airport}",
+        "price_note": "Prices are round-trip totals for one adult, covering both the outbound and return flights.",
         "outbound_date": outbound.isoformat(),
         "return_date": return_day.isoformat(),
         "options": options,
