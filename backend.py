@@ -14,6 +14,7 @@ from psycopg_pool import ConnectionPool
 from langgraph.graph import StateGraph, START, END, add_messages
 from langgraph.checkpoint.postgres import PostgresSaver
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_anthropic import ChatAnthropic
 from langgraph.types import interrupt, Command
 from typing import TypedDict, Annotated, Any
 from psycopg.rows import dict_row
@@ -79,8 +80,25 @@ backup_llm = ChatGoogleGenerativeAI(
     timeout=60,
 )
 
+fallback_models = [backup_llm]
 
-llm = main_llm.with_fallbacks([backup_llm])
+# last backup from a different company: when Google is overloaded, both Gemini models
+# often fail together, but Claude doesn't depend on Google's servers
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+if ANTHROPIC_API_KEY:
+    claude_llm = ChatAnthropic(
+        model="claude-haiku-5-5",
+        api_key=ANTHROPIC_API_KEY,
+        max_tokens=8000,
+        max_retries=1,
+        timeout=60,
+    )
+    fallback_models.append(claude_llm)
+
+llm = main_llm.with_fallbacks(fallback_models)
+
+
 
 class TravelState(TypedDict, total=False):
 
@@ -598,16 +616,22 @@ Rules:
 - If a section's input data is missing, acknowledge that briefly rather than guessing.
 """
 
-    budget_text = llm_text(
-        "You are a practical, detail-oriented travel budget analyst. Use only the "
-        "provided data and clearly flag any estimates as approximate.",
-        prompt
-    )
+    try:
+        budget_text = llm_text(
+            "You are a practical, detail-oriented travel budget analyst. Use only the "
+            "provided data and clearly flag any estimates as approximate.",
+            prompt
+        )
+        llm_calls_made = 1
+    except Exception as e:
+        print(f"Budget agent LLM failed: {e}")
+        budget_text = "Budget analysis is unavailable right now."
+        llm_calls_made = 0
 
     return {
         "budget_results": budget_text,
         "messages": [AIMessage(content="Budget assessment generated.")],
-        "llm_calls": state.get("llm_calls", 0) + 1
+        "llm_calls": state.get("llm_calls", 0) + llm_calls_made
     }
 
 
@@ -644,11 +668,21 @@ Instructions:
 - Make the itinerary rational, practical, budget-aware, and easy to follow.
 """
 
-    itinerary_text = llm_text(
-        "You are an expert travel planner with best-in-class budget planning. "
-        "Ground every recommendation strictly in the data provided.",
-        prompt
-    )
+    try:
+        itinerary_text = llm_text(
+            "You are an expert travel planner with best-in-class budget planning. "
+            "Ground every recommendation strictly in the data provided.",
+            prompt
+        )
+        llm_calls_made = 1
+
+    except Exception as e:
+        print(f"Itinerary agent LLM failed: {e}")
+        itinerary_text = (
+            "The draft itinerary couldn't be created because the AI models are busy right now. "
+            "Please send your request again in a minute."
+        )
+        llm_calls_made = 0
     
 
     approval_request = (
@@ -660,7 +694,7 @@ Instructions:
         "itinerary": itinerary_text,
         "approval_request": approval_request,
         "messages": [AIMessage(content="Draft itinerary created for human review.")],
-        "llm_calls": state.get("llm_calls", 0) + 1
+        "llm_calls": state.get("llm_calls", 0) + llm_calls_made
     }
 
 
@@ -744,17 +778,26 @@ Structure your response using clean Markdown with the following exact sections:
 - Keep the tone professional, inspiring, and highly actionable.
 """
 
-    final_text = llm_text(
-        "You are an expert, high-end travel concierge. Your goal is to format raw "
-        "travel data into visually appealing, highly practical, and easy-to-read "
-        "itineraries, strictly honoring any human review instructions given.",
-        final_prompt
-    )
+    try:
+        final_text = llm_text(
+            "You are an expert, high-end travel concierge. Your goal is to format raw "
+            "travel data into visually appealing, highly practical, and easy-to-read "
+            "itineraries, strictly honoring any human review instructions given.",
+            final_prompt
+        )
+        llm_calls_made = 1
+    except Exception as e:
+        print(f"Final agent LLM failed: {e}")
+        final_text = (
+            "The final plan couldn't be created because the AI models are busy right now. "
+            "Your approved draft above is still valid. Please try approving again in a minute."
+        )
+        llm_calls_made = 0
 
     return {
         "final_response": final_text,
         "messages": [AIMessage(content=final_text)],
-        "llm_calls": state.get("llm_calls", 0) + 1
+        "llm_calls": state.get("llm_calls", 0) + llm_calls_made
     }
 
 

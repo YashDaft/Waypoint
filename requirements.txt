@@ -15,3 +15,4 @@ pydantic
 jinja2
 mcp
 python-dotenv
+langchain-anthropic
