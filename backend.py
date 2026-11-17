@@ -63,19 +63,19 @@ if not GEMINI_API_KEY:
     raise ValueError("GOOGLE_API_KEY not found in environment variables, please add gemini api key to .env file")
 
 
-# main model: fast and smart, but Google sometimes returns 503 when it's busy
+# main model: fastest Gemini, answered every step quickly in our measurements
 main_llm = ChatGoogleGenerativeAI(
-    model="gemini-3.6-flash",
+    model="gemini-3.5-flash-lite",
     api_key=GEMINI_API_KEY,
-    max_retries=2,
+    max_retries=1,
     timeout=60,
 )
 
-# backup model: used only if the main model fails
+# backup model: stronger, but slow and often overloaded, so only used if the main model fails
 backup_llm = ChatGoogleGenerativeAI(
-    model="gemini-3.5-flash-lite",
+    model="gemini-3.6-flash",
     api_key=GEMINI_API_KEY,
-    max_retries=2,
+    max_retries=1,
     timeout=60,
 )
 
