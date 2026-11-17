@@ -64,28 +64,18 @@ if not GEMINI_API_KEY:
     raise ValueError("GOOGLE_API_KEY not found in environment variables, please add gemini api key to .env file")
 
 
-# main model: fastest Gemini, answered every step quickly in our measurements
-main_llm = ChatGoogleGenerativeAI(
+# Gemini Flash-Lite: fast, from a different company, used as the backup
+gemini_llm = ChatGoogleGenerativeAI(
     model="gemini-3.5-flash-lite",
     api_key=GEMINI_API_KEY,
     max_retries=1,
     timeout=60,
 )
 
-# backup model: stronger, but slow and often overloaded, so only used if the main model fails
-backup_llm = ChatGoogleGenerativeAI(
-    model="gemini-3.6-flash",
-    api_key=GEMINI_API_KEY,
-    max_retries=1,
-    timeout=60,
-)
-
-fallback_models = [backup_llm]
-
-# last backup from a different company: when Google is overloaded, both Gemini models
-# often fail together, but Claude doesn't depend on Google's servers
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
+#main model: Claude Haiku 5.5. In our supervisor evaluation it matched Lite on accuracy,
+#was faster, and never failed. Gemini is the backup if Claude fails.
 if ANTHROPIC_API_KEY:
     claude_llm = ChatAnthropic(
         model="claude-haiku-5-5",
@@ -94,9 +84,10 @@ if ANTHROPIC_API_KEY:
         max_retries=1,
         timeout=60,
     )
-    fallback_models.append(claude_llm)
-
-llm = main_llm.with_fallbacks(fallback_models)
+    llm = claude_llm.with_fallbacks([gemini_llm])
+else:
+    #without a Claude key, use Gemini on its own
+    llm = gemini_llm
 
 
 
