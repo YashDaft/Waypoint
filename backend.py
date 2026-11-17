@@ -790,7 +790,8 @@ Structure your response using clean Markdown with the following exact sections:
         print(f"Final agent LLM failed: {e}")
         final_text = (
             "The final plan couldn't be created because the AI models are busy right now. "
-            "Your approved draft above is still valid. Please try approving again in a minute."
+            "Your approved draft above is still valid. Please send your request again in a minute "
+            "to get the polished version."
         )
         llm_calls_made = 0
 
