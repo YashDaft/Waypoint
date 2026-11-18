@@ -12,6 +12,7 @@ load_dotenv()
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 import backend
 
+# the standard set by default; "hard" as a second word switches to the hard set
 DATASET_NAME = "waypoint-supervisor"
 CASES_FILE = Path(__file__).parent / "supervisor_cases.json"
 
@@ -87,6 +88,13 @@ def expected_date(rule):
     if rule["rule"] == "days_from_today":
         return (today + timedelta(days=rule["value"])).isoformat()
 
+    if rule["rule"] == "next_weekday":
+        # value is the weekday number: 0 = Monday ... 5 = Saturday, 6 = Sunday
+        days_ahead = (rule["value"] - today.weekday()) % 7
+        if days_ahead == 0:
+            days_ahead = 7
+        return (today + timedelta(days=days_ahead)).isoformat()
+
     # "month_day": the next time that date comes around
     month, day = rule["value"].split("-")
     next_date = date(today.year, int(month), int(day))
@@ -147,11 +155,21 @@ def check_supervisor(outputs, reference_outputs):
 # ---------- 5. run it ----------
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2 or sys.argv[1] not in MODELS:
-        print("Usage: uv run python evals/run_supervisor_eval.py lite|haiku|chain")
+    usage_ok = len(sys.argv) in (2, 3) and sys.argv[1] in MODELS
+    if len(sys.argv) == 3 and sys.argv[2] != "hard":
+        usage_ok = False
+
+    if not usage_ok:
+        print("Usage: uv run python evals/run_supervisor_eval.py lite|haiku|chain [hard]")
         sys.exit(1)
 
     model_name = sys.argv[1]
+    set_name = "standard"
+
+    if len(sys.argv) == 3:
+        set_name = "hard"
+        DATASET_NAME = "waypoint-supervisor-hard"
+        CASES_FILE = Path(__file__).parent / "supervisor_cases_hard.json"
 
     if MODELS[model_name] is None:
         print("Claude isn't set up: add ANTHROPIC_API_KEY to .env first")
@@ -167,13 +185,14 @@ if __name__ == "__main__":
         run_supervisor,
         data=DATASET_NAME,
         evaluators=[check_supervisor],
-        experiment_prefix=f"supervisor-{model_name}",
+        experiment_prefix=f"supervisor-{set_name}-{model_name}",
         max_concurrency=2,
     )
 
     # add up each score and the time per case, so the summary prints here as well as in LangSmith
     scores = {}
     seconds = []
+    failures = []
 
     for row in results:
         run = row["run"]
@@ -182,6 +201,14 @@ if __name__ == "__main__":
         for result in row["evaluation_results"]["results"]:
             scores.setdefault(result.key, []).append(result.score)
 
-    print(f"\n===== {model_name}: {len(seconds)} cases, average {sum(seconds) / len(seconds):.1f}s per case =====")
+            # remember which cases got a 0, so we can see what went wrong
+            if result.score == 0 and result.key != "failed":
+                failures.append(f"{result.key}: {row['example'].inputs['request'][:70]}")
+
+    print(f"\n===== {model_name} ({set_name} set): {len(seconds)} cases, average {sum(seconds) / len(seconds):.1f}s per case =====")
     for key, values in scores.items():
         print(f"{key:<30} {sum(values)}/{len(values)}")
+
+    print("\nCases that got a 0:")
+    for failure in failures:
+        print("  " + failure)

@@ -263,9 +263,12 @@ Extra fields for flight search:
   empty if the city is not mentioned.
 - travel_date: only if the user gave a specific start date, written as
   YYYY-MM-DD. Today's date is {date.today().isoformat()}, so use it to work out
-  the year. Leave it empty if no date was given.
+  the year. A month or a vague time on its own ("in December", "next month",
+  "sometime in February") is not a specific date, so leave it empty then too.
+  Leave it empty if no date was given.
 - trip_days: the trip length in days as a number (for example 5), if the user
-  mentioned it. Leave it empty otherwise.
+  mentioned it. Common phrases count as a stated length: weekend = 2,
+  long weekend = 3, a week = 7, a fortnight = 14. Leave it empty otherwise.
 
 User request:
 {query}
