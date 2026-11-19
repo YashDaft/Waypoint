@@ -1,0 +1,54 @@
+# Runs the pytest tests on GitHub's computer every time you push.
+# No real API keys are needed: every model and tool call in the tests is faked.
+
+name: Tests
+
+on:
+  push:                 # every push, to any branch
+  workflow_dispatch:    # adds a "Run workflow" button on the Actions tab
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    # backend.py connects to Postgres when it's imported, so start an empty
+    # throwaway database for this run. GitHub deletes it when the job ends.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # wait until the database is ready before the steps start
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # backend.py checks that these exist when it loads; the values are fake
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+      GOOGLE_API_KEY: fake-key-for-tests
+      ANTHROPIC_API_KEY: fake-key-for-tests
+      TAVILY_API_KEY: fake-key-for-tests
+      SERPAPI_API_KEY: fake-key-for-tests
+      OPENWEATHER_API_KEY: fake-key-for-tests
+      LANGSMITH_TRACING: "false"
+
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Run the tests
+        run: pytest -v
