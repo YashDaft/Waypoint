@@ -498,7 +498,8 @@ def hotel_agent(state: TravelState):
 
         for item in data.get("results", [])[:5]:
             title = item.get("title", "")
-            content = item.get("content", "")[:400]
+            # line breaks inside the content would break the list, so join it into one line
+            content = item.get("content", "")[:400].replace("\n", " ")
             url = item.get("url", "")
             lines.append(f"- {title}: {content} (source: {url})")
 
@@ -562,17 +563,15 @@ def weather_agent(state: TravelState):
         )
 
     return {
-        "weather_results": f"""
-        **Current Weather for {city}**
-
-        {weather_data}
-
-        **Forecast Weather for {city}**
-
-        {forecast_data}
-
-        {forecast_note}
-        """,
+        # _extract_text keeps only the JSON text from the MCP result,
+        # and the ``` lines mark it as a code block so it displays cleanly
+        "weather_results": (
+            f"**Current weather for {city}**\n\n"
+            f"```json\n{_extract_text(weather_data)}\n```\n\n"
+            f"**Forecast for {city}**\n\n"
+            f"```json\n{_extract_text(forecast_data)}\n```\n\n"
+            f"{forecast_note}"
+        ),
         "messages": [
             AIMessage(content="Weather information fetched.")
         ],
@@ -1012,48 +1011,3 @@ def resume_travel_agent(thread_id: str, approved: bool, feedback: str = ""):
     )
 
     return _serialize_result(result, thread_id)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-
-    
-
-
-     
-
-
-
-
-    
-
-
-
-
-
-
-    

@@ -6,12 +6,12 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Waypoint AI</title>
+    <title>Waypoint | Multi-agent trip planner</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
 
     <link rel="stylesheet" href="/static/style.css">
@@ -19,26 +19,31 @@
 
 <body>
 
-    <div class="page-bg">
-        <div class="gradient-circle circle-1"></div>
-        <div class="gradient-circle circle-2"></div>
-        <div class="gradient-circle circle-3"></div>
+    <!-- Background: a faint map grid with flight paths between waypoints -->
+    <div class="page-bg" aria-hidden="true">
+        <svg class="flight-paths" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+            <path d="M80 620 Q 360 260 700 420" />
+            <path d="M700 420 Q 900 160 1140 240" />
+            <path d="M260 120 Q 520 40 760 150" />
+            <circle cx="80" cy="620" r="5" />
+            <circle cx="700" cy="420" r="5" />
+            <circle cx="1140" cy="240" r="5" />
+            <circle cx="260" cy="120" r="4" />
+            <circle cx="760" cy="150" r="4" />
+        </svg>
     </div>
 
     <main class="app-container">
 
         <section class="hero-section">
-            <div class="badge">
-                ✈️ Waypoint AI — A Multi-Agent Travel Planner with LangGraph and MCP
-            </div>
+            <p class="hero-kicker">A multi-agent trip planner built on LangGraph and MCP</p>
 
-            <h1>
-                Plan Your Perfect Trip with AI
-            </h1>
+            <h1>Where to next?</h1>
 
-            <p>
-                A supervisor agent sends your request to specialist agents for flights, hotels, weather and budget.
-                You review the draft itinerary before the final plan is created.
+            <p class="hero-text">
+                Describe your trip in your own words. A supervisor agent picks the specialists it needs
+                for live flights, hotels, weather and budget, and you approve the draft before the final
+                plan is written.
             </p>
         </section>
 
@@ -46,51 +51,55 @@
 
             <div class="card-header">
                 <div>
-                    <h2>Where do you want to go?</h2>
+                    <h2>Your trip</h2>
                     <p>
-                        Example: Plan a complete 7 days Japan trip from India under 3 lakhs.
+                        Include where you're leaving from, where you're going, when, and for how long.
                     </p>
                 </div>
 
-                <div class="status-pill">
+                <div id="statusPill" class="status-pill checking" role="status">
                     <span class="status-dot"></span>
-                    Online
+                    <span id="statusText">Checking</span>
                 </div>
             </div>
 
             <div class="input-area">
                 <textarea id="userInput" aria-label="Your travel request"
-                    placeholder="Plan a complete 7 days Japan trip including flights, hotels and sightseeing under 3 lakhs..."></textarea>
+                    placeholder="Plan a 5 day Dubai trip from Delhi starting 20 December with flights, hotels and a budget of ₹1,00,000..."></textarea>
 
                 <button id="sendBtn" type="button" onclick="sendMessage()">
-                    <span id="btnText">Generate Draft</span>
+                    <span id="btnText">Plan my trip</span>
                     <span id="btnLoader" class="loader hidden"></span>
                 </button>
             </div>
 
+            <p class="shortcut-hint">Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to send</p>
+
             <p id="loadingNote" class="loading-note hidden" role="status">
                 <span class="note-spinner" aria-hidden="true"></span>
-                The agents are working on your plan. This can take up to a minute.
+                <span>Planning your trip <span id="loadingTimer" class="timer">0:00</span>. This usually takes about a minute.</span>
             </p>
 
-            <div class="quick-prompts">
+            <div class="quick-prompts" aria-label="Example requests">
+                <span class="quick-label">Try one:</span>
+
                 <button type="button"
-                    onclick="setPrompt('Plan a complete 7 days Japan trip from India including flights, hotels and sightseeing under 3 lakhs.')">
-                    Japan Trip
+                    onclick="setPrompt('Plan a 5 day Dubai trip from Delhi starting 20 December with flights, hotels, weather and a budget of ₹1,00,000')">
+                    Dubai, 5 days, ₹1 lakh
                 </button>
 
                 <button type="button"
-                    onclick="setPrompt('Plan a 5 days Dubai trip from Delhi with flights, hotels and sightseeing.')">
-                    Dubai Trip
+                    onclick="setPrompt('Long weekend in Goa from Mumbai, I need flights and a hotel near the beach')">
+                    Goa long weekend
                 </button>
 
                 <button type="button"
-                    onclick="setPrompt('Plan a 7 days Thailand trip from India with budget hotels and sightseeing.')">
-                    Thailand Trip
+                    onclick="setPrompt('Plan a 6 day trip to Tokyo from Bengaluru in April with flights, hotels and the usual weather')">
+                    Tokyo in April
                 </button>
 
-                <button type="button" onclick="setPrompt('Give me all country flight info.')">
-                    Global Flights
+                <button type="button" onclick="setPrompt('Write me a Python script that sorts a list')">
+                    An off-topic request
                 </button>
             </div>
 
@@ -100,16 +109,25 @@
 
             <div class="workflow-header">
                 <div>
-                    <h2 id="workflowTitle">Execution Plan</h2>
+                    <h2 id="workflowTitle">Your route</h2>
                     <p id="workflowSubtitle">Chosen by the supervisor agent for your request.</p>
                 </div>
 
                 <span id="guardrailBadge" class="guardrail-badge">Guardrail passed</span>
             </div>
 
+            <!-- Trip details the supervisor understood, shown like a boarding pass -->
+            <div id="tripCard" class="trip-card hidden" aria-label="Trip details the planner understood"></div>
+
             <p id="supervisorReasoning" class="supervisor-reasoning"></p>
 
-            <ol id="agentRoute" class="route" aria-label="Agents that run, in order"></ol>
+            <ol id="agentRoute" class="route" aria-label="Steps in your plan, in order"></ol>
+
+            <!-- What each specialist agent returned, collapsed by default -->
+            <div id="agentOutputs" class="agent-outputs hidden">
+                <h3>What each agent found</h3>
+                <div id="agentOutputList"></div>
+            </div>
 
         </section>
 
@@ -117,11 +135,14 @@
 
             <div class="result-header">
                 <div>
-                    <h2 id="resultTitle">Your AI Travel Plan</h2>
+                    <div class="result-title-row">
+                        <h2 id="resultTitle">Your travel plan</h2>
+                        <span id="stagePill" class="stage-pill">Draft</span>
+                    </div>
                     <p id="resultHint" class="result-hint hidden">
                         This is a draft. Approve it or ask for changes below the plan.
                     </p>
-                    <p id="threadInfo">Thread ID: -</p>
+                    <p id="threadInfo" class="thread-info">Plan ID: -</p>
                 </div>
 
                 <div class="result-actions">
@@ -136,8 +157,14 @@
             </div>
 
             <div id="pdfContent" class="pdf-content">
-                <h1 class="pdf-title">AI Travel Plan</h1>
+                <h1 class="pdf-title">Waypoint travel plan</h1>
                 <div id="resultBox" class="result-box"></div>
+            </div>
+
+            <div id="newPlanRow" class="new-plan-row hidden">
+                <button class="new-plan-btn" type="button" onclick="startNewPlan()">
+                    Plan another trip
+                </button>
             </div>
 
         </section>
@@ -147,22 +174,33 @@
             <div class="approval-icon" aria-hidden="true">👤</div>
 
             <div class="approval-content">
-                <h2 id="approvalTitle">Review the draft itinerary</h2>
+                <h2 id="approvalTitle">Review the draft</h2>
                 <p id="approvalRequest">
-                    Approve the draft or provide feedback before the final plan is generated.
+                    Approve the draft or ask for changes before the final plan is written.
                 </p>
 
-                <label class="sr-only" for="approvalFeedback">Revision feedback</label>
+                <div class="feedback-chips" aria-label="Common changes">
+                    <button type="button" onclick="addFeedback('Keep the hotel cheaper.')">Cheaper hotel</button>
+                    <button type="button" onclick="addFeedback('Add a free day with nothing planned.')">Add a free day</button>
+                    <button type="button" onclick="addFeedback('Include more local food places.')">More local food</button>
+                    <button type="button" onclick="addFeedback('Avoid early morning starts.')">No early starts</button>
+                </div>
+
+                <label class="sr-only" for="approvalFeedback">Changes you want</label>
                 <textarea id="approvalFeedback" class="feedback-input"
                     placeholder="Want changes? Tell the planner what to adjust, for example: reduce the hotel cost and add one free day..."></textarea>
 
                 <div class="approval-actions">
                     <button id="approveBtn" class="approve-btn" type="button" onclick="submitApproval(true)">
-                        Approve &amp; Generate Final
+                        Approve and write final plan
                     </button>
 
                     <button id="reviseBtn" class="revise-btn" type="button" onclick="submitApproval(false)">
-                        Revise Using Feedback
+                        Revise with my changes
+                    </button>
+
+                    <button id="discardBtn" class="discard-btn" type="button" onclick="startNewPlan()">
+                        Discard draft
                     </button>
                 </div>
             </div>
@@ -174,11 +212,16 @@
     </main>
 
     <footer>
-        Built with FastAPI, LangGraph, Gemini, PostgreSQL, Tavily, AviationStack, OpenWeather and MCP
+        <p>
+            Built with LangGraph, FastAPI and MCP. Claude Haiku plans the trip with Gemini as a backup,
+            live fares come from Google Flights through SerpApi, hotels from Tavily, weather from OpenWeather,
+            and each plan is saved in Postgres.
+        </p>
     </footer>
 
-    <!-- Markdown Renderer -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Markdown renderer and sanitizer: pinned versions, so a new release can't break the page -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
 
     <!-- PDF Download Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>

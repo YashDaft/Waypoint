@@ -30,7 +30,7 @@ FLIGHTS_ENV = {"SERPAPI_API_KEY": SERPAPI_API_KEY}
 
 GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY not found in environment variables, please add gemini api key to .env file")
+    raise ValueError("GOOGLE_API_KEY not found in environment variables, please add your Gemini API key to the .env file")
 
 
 llm = ChatGoogleGenerativeAI(
@@ -66,13 +66,13 @@ client = MultiServerMCPClient(
 
 search_tool = None
 
-aviation_tools = {}
+other_tools = {}
 
 async def initialize_mcp():
 
-    global search_tool, aviation_tools
+    global search_tool, other_tools
 
-    if search_tool is not None and aviation_tools:
+    if search_tool is not None and other_tools:
         return
     
     tools = await client.get_tools()
@@ -85,7 +85,7 @@ async def initialize_mcp():
         if tool.name == "tavily_search"
     )
 
-    aviation_tools = {
+    other_tools = {
         tool.name: tool
         for tool in tools
         if tool.name != "tavily_search"
@@ -159,7 +159,7 @@ async def forecast_mcp_search(city: str):
 
 #helper function to extract text from response
 def _extract_text(content):
-    """Gemini responses can return content as a plain string or a list of content blocks."""
+    """LLM and MCP results can be a plain string or a list of content blocks; this returns just the text."""
     if isinstance(content, str):
         return content.strip()
     if isinstance(content, list):
@@ -186,38 +186,3 @@ def extract_destination(query: str):
     response = llm.invoke(prompt)
 
     return _extract_text(response.content)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-
-
-
-    
-        
-
