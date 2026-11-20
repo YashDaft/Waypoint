@@ -1,3 +1,4 @@
+import os
 import sys
 import json
 from pathlib import Path
@@ -212,3 +213,58 @@ if __name__ == "__main__":
     print("\nCases that got a 0:")
     for failure in failures:
         print("  " + failure)
+
+    # ---------- 6. pass or fail ----------
+
+    # the lowest share of cases each score must get right (0.9 means 90%).
+    # A guardrail mistake is a safety problem, so it must be perfect.
+    # The others allow for the 1-2 case differences we saw between runs.
+    MINIMUM_SCORES = {
+        "guardrail_correct": 1.0,
+        "routing_correct": 0.9,
+        "origin_airport_correct": 0.75,
+        "destination_airport_correct": 0.75,
+        "travel_date_correct": 0.75,
+        "trip_days_correct": 0.75,
+    }
+    MAX_FAILED_CASES = 2
+
+    problems = []
+
+    for key, minimum in MINIMUM_SCORES.items():
+        values = scores.get(key, [])
+        if values and sum(values) / len(values) < minimum:
+            problems.append(f"{key} is {sum(values)}/{len(values)}, below the minimum of {minimum:.0%}")
+
+    failed_cases = sum(scores.get("failed", []))
+    if failed_cases > MAX_FAILED_CASES:
+        problems.append(f"{failed_cases} cases got no answer from the model (at most {MAX_FAILED_CASES} allowed)")
+
+    # on GitHub Actions, also write the results onto the run's page
+    summary_file = os.getenv("GITHUB_STEP_SUMMARY")
+
+    if summary_file:
+        with open(summary_file, "a", encoding="utf-8") as summary:
+            summary.write(f"### {model_name}, {set_name} set: {len(seconds)} cases\n\n")
+            summary.write("| Score | Result |\n|---|---|\n")
+
+            for key, values in scores.items():
+                summary.write(f"| {key} | {sum(values)}/{len(values)} |\n")
+
+            if problems:
+                summary.write("\n**Failed:**\n\n")
+                for problem in problems:
+                    summary.write(f"- {problem}\n")
+            else:
+                summary.write("\n**Passed.**\n")
+
+            summary.write("\n")
+
+    # exit code 1 tells GitHub Actions this step failed, so the run shows a red cross
+    if problems:
+        print("\nEVALUATION FAILED:")
+        for problem in problems:
+            print("  " + problem)
+        sys.exit(1)
+
+    print("\nEvaluation passed.")
