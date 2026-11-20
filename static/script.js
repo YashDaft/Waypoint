@@ -266,7 +266,8 @@ function addRouteStop(route, label, source, state) {
 }
 
 // The agents that ran, then the review and the final plan.
-function showRoute(selectedAgents, stage) {
+// approved is false when the user asked for changes instead of approving.
+function showRoute(selectedAgents, stage, approved) {
     const route = $("agentRoute");
     route.replaceChildren();
 
@@ -279,7 +280,7 @@ function showRoute(selectedAgents, stage) {
         addRouteStop(route, "👤 Your review", "Waiting for you", "current");
         addRouteStop(route, "✨ Final plan", "", "next");
     } else {
-        addRouteStop(route, "👤 Your review", "Approved", "done");
+        addRouteStop(route, "👤 Your review", approved ? "Approved" : "Your changes applied", "done");
         addRouteStop(route, "✨ Final plan", "Ready", "done");
     }
 }
@@ -336,7 +337,7 @@ function showWorkflow(data, stage) {
         $("agentOutputs").classList.add("hidden");
     } else {
         showTripCard(data.trip_constraints);
-        showRoute(data.selected_agents || [], stage);
+        showRoute(data.selected_agents || [], stage, data.approved !== false);
         showAgentOutputs(data);
     }
 
