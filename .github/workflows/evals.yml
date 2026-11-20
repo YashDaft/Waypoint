@@ -1,0 +1,67 @@
+# Runs the 52-case supervisor evaluation (standard + hard sets) with the real model.
+# This makes real API calls, so it doesn't run on every push: you start it with the
+# "Run workflow" button, and it runs on pull requests that change the agent's code or prompts.
+
+name: Evaluation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - backend.py
+      - mcp_client.py
+      - evals/**
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+
+    # the same throwaway database as the tests, because the script imports backend.py
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+
+      # real keys, read from the repository's secrets (Settings -> Secrets and variables -> Actions)
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+      LANGSMITH_TRACING: "true"
+      LANGSMITH_PROJECT: Waypoint
+
+      # the evaluation only calls Claude, so these just need to exist
+      GOOGLE_API_KEY: fake-key-for-evals
+      TAVILY_API_KEY: fake-key-for-evals
+      SERPAPI_API_KEY: fake-key-for-evals
+      OPENWEATHER_API_KEY: fake-key-for-evals
+
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Evaluate the standard set
+        run: python evals/run_supervisor_eval.py haiku
+
+      # always() runs this step even if the standard set failed, so you see both results
+      - name: Evaluate the hard set
+        if: always()
+        run: python evals/run_supervisor_eval.py haiku hard
